@@ -72,10 +72,17 @@ python run.py -i accounts.csv --channel chrome
 Web UI:
 
 ```powershell
-python run.py --web --port 8787
+python run.py --web --host 127.0.0.1 --port 8787
 ```
 
 Open http://127.0.0.1:8787
+
+First visit sets the admin password. Later visits require that password.
+Optional reset:
+
+```powershell
+python run.py --web --admin-password "your-admin-password"
+```
 
 Useful flags:
 

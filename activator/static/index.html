@@ -3,165 +3,121 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Antigravity Activator</title>
-  <style>
-    :root {
-      --bg: #14110d;
-      --panel: #1e1a14;
-      --line: #3a3226;
-      --ink: #f3e6d0;
-      --muted: #b7a48a;
-      --accent: #e4572e;
-      --ok: #7cb342;
-      --bad: #e4572e;
-      --warn: #e0a100;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
-      background:
-        radial-gradient(1200px 500px at 10% -10%, #3b2418 0%, transparent 55%),
-        linear-gradient(180deg, #1a1611 0%, #0f0d0a 100%);
-      color: var(--ink);
-      min-height: 100vh;
-    }
-    header {
-      padding: 28px 32px 8px;
-      border-bottom: 1px solid var(--line);
-    }
-    header h1 {
-      margin: 0;
-      font-family: "IBM Plex Mono", "Cascadia Mono", monospace;
-      font-size: 22px;
-      letter-spacing: .08em;
-      text-transform: uppercase;
-    }
-    header p { margin: 8px 0 16px; color: var(--muted); }
-    main {
-      display: grid;
-      grid-template-columns: 1.1fr .9fr;
-      gap: 20px;
-      padding: 24px 32px 40px;
-    }
-    .card {
-      background: color-mix(in srgb, var(--panel) 92%, black);
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      padding: 18px;
-    }
-    label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 6px; }
-    textarea, input, select {
-      width: 100%;
-      background: #120f0c;
-      color: var(--ink);
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      padding: 10px 12px;
-      font-family: "IBM Plex Mono", monospace;
-    }
-    textarea { min-height: 220px; resize: vertical; }
-    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .btns { display: flex; gap: 10px; margin-top: 16px; }
-    button {
-      border: 0;
-      border-radius: 999px;
-      padding: 10px 18px;
-      font-weight: 700;
-      cursor: pointer;
-    }
-    .go { background: var(--accent); color: #fff; }
-    .stop { background: #3a3226; color: var(--ink); }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); }
-    .ok { color: var(--ok); }
-    .error, .bad { color: var(--bad); }
-    .partial { color: var(--warn); }
-    pre {
-      height: 280px;
-      overflow: auto;
-      background: #100e0b;
-      border-radius: 10px;
-      padding: 12px;
-      font-size: 12px;
-      color: #d9cbb3;
-    }
-    @media (max-width: 980px) {
-      main { grid-template-columns: 1fr; padding: 16px; }
-    }
-  </style>
+  <title>HaizhuAntigravity</title>
+  <link rel="stylesheet" href="/static/app.css" />
 </head>
 <body>
-  <header>
-    <h1>Antigravity Activator</h1>
-    <p>导入 Google 账号 / 密码 / TOTP，完成一次 Antigravity OAuth + onboard，解锁账号权限。</p>
-  </header>
-  <main>
-    <section class="card">
-      <label>账号列表（email,password,totp[,proxy]）</label>
-      <textarea id="blob" placeholder="demo@gmail.com,AppPassword,JBSWY3DPEHPK3PXP"></textarea>
-      <label>或上传 CSV / JSON</label>
-      <input id="file" type="file" />
-      <div class="row">
-        <div>
-          <label>浏览器通道</label>
-          <select id="channel">
-            <option value="chrome">chrome</option>
-            <option value="msedge">msedge</option>
-            <option value="">chromium</option>
-          </select>
+  <a class="skip" href="#main">跳到主内容</a>
+
+  <div id="gate" class="wrap gate-shell hidden">
+    <section class="mast" aria-hidden="false">
+      <div class="kicker">Haizhu Console</div>
+      <h1 class="wordmark">Anti<span>gravity</span></h1>
+      <p>管理员密码进门。进去之后填邮箱、密码、2FA、代理，点火跑一次官方首登。</p>
+    </section>
+    <form id="gateForm" class="panel" onsubmit="submitGate(event)">
+      <h2 id="gateTitle" class="section-title">管理员登录</h2>
+      <p class="lede" id="gateHint">输入管理员密码进入激活台。</p>
+      <div id="setupExtra" class="hidden">
+        <div class="field">
+          <label for="setupPassword">设置管理员密码</label>
+          <input id="setupPassword" name="setupPassword" type="password" autocomplete="new-password" minlength="6" />
         </div>
-        <div>
-          <label>超时秒</label>
-          <input id="timeout" type="number" value="180" />
+        <div class="field">
+          <label for="setupConfirm">再输入一次</label>
+          <input id="setupConfirm" name="setupConfirm" type="password" autocomplete="new-password" minlength="6" />
         </div>
       </div>
-      <label>全局代理（可选，http://127.0.0.1:7890）</label>
-      <input id="proxy" placeholder="留空则直连 / 用账号自己的 proxy 列" />
-      <div class="btns">
-        <button class="go" onclick="startJob()">开始激活</button>
-        <button class="stop" onclick="stopJob()">停止</button>
+      <div id="loginExtra">
+        <div class="field">
+          <label for="loginPassword">管理员密码</label>
+          <input id="loginPassword" name="loginPassword" type="password" autocomplete="current-password" />
+        </div>
       </div>
-    </section>
-    <section class="card">
-      <label>状态</label>
-      <div id="meta">idle</div>
-      <table>
-        <thead><tr><th>email</th><th>status</th><th>detail</th></tr></thead>
-        <tbody id="rows"></tbody>
-      </table>
-      <label>日志</label>
-      <pre id="logs"></pre>
-    </section>
-  </main>
-  <script>
-    async function startJob() {
-      const fd = new FormData();
-      fd.append("blob", document.getElementById("blob").value);
-      fd.append("channel", document.getElementById("channel").value);
-      fd.append("timeout", document.getElementById("timeout").value);
-      fd.append("proxy", document.getElementById("proxy").value);
-      fd.append("headed", "1");
-      const f = document.getElementById("file").files[0];
-      if (f) fd.append("file", f);
-      const r = await fetch("/api/start", { method: "POST", body: fd });
-      const j = await r.json();
-      if (!j.ok) alert(j.error || "start failed");
-    }
-    async function stopJob() {
-      await fetch("/api/stop", { method: "POST" });
-    }
-    async function tick() {
-      const r = await fetch("/api/status");
-      const j = await r.json();
-      document.getElementById("meta").textContent = j.running ? ("running / loaded " + j.loaded) : ("idle / loaded " + j.loaded);
-      document.getElementById("logs").textContent = (j.logs || []).join("\n");
-      document.getElementById("logs").scrollTop = 99999;
-      const tb = document.getElementById("rows");
-      tb.innerHTML = (j.results || []).map(x => `<tr><td>${x.email}</td><td class="${x.status}">${x.status}</td><td>${x.message || ""}</td></tr>`).join("");
-    }
-    setInterval(tick, 1000);
-    tick();
-  </script>
+      <p class="alert" id="gateErr" role="alert"></p>
+      <div class="gate-actions">
+        <button class="btn-primary" id="gateBtn" type="submit">进入</button>
+      </div>
+    </form>
+  </div>
+
+  <div id="app" class="wrap hidden">
+    <header class="topbar">
+      <div>
+        <div class="kicker">Haizhu Console</div>
+        <h1 class="wordmark">Anti<span>gravity</span></h1>
+        <p class="lede">填写账号后一键激活。过程日志钉在下面，跑起来不要关窗口。</p>
+      </div>
+      <div class="row-actions">
+        <div class="status" id="statusPill"><i></i><span id="statusText">idle</span></div>
+        <button class="btn-ghost" type="button" onclick="logout()">退出</button>
+      </div>
+    </header>
+
+    <main id="main" class="stack">
+      <section class="panel" aria-labelledby="composeTitle">
+        <h2 id="composeTitle" class="section-title">投放账号</h2>
+        <div class="compose">
+          <div>
+            <label for="email">邮箱</label>
+            <input id="email" name="email" type="email" autocomplete="username" placeholder="you@gmail.com" />
+          </div>
+          <div>
+            <label for="password">密码</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Google 密码" />
+          </div>
+          <div>
+            <label for="totp">2FA / TOTP</label>
+            <input id="totp" name="totp" spellcheck="false" placeholder="Base32 或 otpauth://" />
+          </div>
+          <div>
+            <label for="proxy">代理</label>
+            <input id="proxy" name="proxy" placeholder="http://127.0.0.1:7890" />
+          </div>
+        </div>
+        <div class="settings">
+          <div>
+            <label for="channel">浏览器</label>
+            <select id="channel">
+              <option value="chrome">chrome</option>
+              <option value="msedge">msedge</option>
+              <option value="chromium">chromium</option>
+            </select>
+          </div>
+          <div>
+            <label for="timeout">超时（秒）</label>
+            <input id="timeout" type="number" min="30" max="600" value="180" />
+          </div>
+        </div>
+        <p class="alert" id="formErr" role="alert"></p>
+        <div class="actions">
+          <button class="btn-ignite" id="igniteBtn" type="button" onclick="activateNow()">一键激活</button>
+          <button class="btn-primary" type="button" onclick="addAccount()">加入队列</button>
+          <button class="btn-stop" id="stopBtn" type="button" onclick="stopJob()">停止</button>
+          <button class="btn-ghost" type="button" onclick="clearQueue()">清空队列</button>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="queueTitle">
+        <h2 id="queueTitle" class="section-title">队列</h2>
+        <p class="lede" id="meta">还没有账号。</p>
+        <div style="overflow:auto">
+          <table class="queue">
+            <thead>
+              <tr><th>邮箱</th><th>2FA</th><th>代理</th><th>状态</th><th></th></tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="logTitle">
+        <h2 id="logTitle" class="section-title">激活过程</h2>
+        <pre class="log" id="logs" aria-live="polite">等待任务...</pre>
+      </section>
+    </main>
+  </div>
+
+  <script src="/static/app.js"></script>
 </body>
 </html>

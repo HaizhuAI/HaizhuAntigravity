@@ -23,6 +23,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--web", action="store_true", help="start local web UI")
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--port", type=int, default=8787)
+    p.add_argument("--admin-password", default="", help="set/reset WebUI admin password")
     return p
 
 
@@ -56,8 +57,7 @@ def main() -> None:
     args = build_parser().parse_args()
     if args.web:
         from .web import serve
-
-        serve(args.host, args.port)
+        serve(args.host, args.port, admin_password=args.admin_password or None)
         return
     raise SystemExit(asyncio.run(run_cli(args)))
 
