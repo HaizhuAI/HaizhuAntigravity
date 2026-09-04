@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+data/*.json
+data/*.jsonl
+data/tokens/
+accounts.csv
+accounts.json
+*.log
+.env
+credentials.json
+.playwright-browsers/
+.env
+.DS_Store
+Thumbs.db
