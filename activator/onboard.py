@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import asyncio
 import json
@@ -7,6 +7,7 @@ from typing import Any
 import httpx
 
 from . import config
+from .proxyutil import httpx_proxy
 
 
 def _extract_project_id(data: dict | None) -> str | None:
@@ -24,9 +25,9 @@ def _extract_project_id(data: dict | None) -> str | None:
     return None
 
 
-async def exchange_code(code: str, verifier: str) -> dict[str, Any]:
+async def exchange_code(code: str, verifier: str, proxy: str | None = None) -> dict[str, Any]:
     client_id, client_secret = config.load_oauth_client()
-    async with httpx.AsyncClient(timeout=30) as client:
+    async with httpx.AsyncClient(timeout=30, proxy=httpx_proxy(proxy)) as client:
         resp = await client.post(
             config.TOKEN_ENDPOINT,
             data={
@@ -43,8 +44,8 @@ async def exchange_code(code: str, verifier: str) -> dict[str, Any]:
         return resp.json()
 
 
-async def userinfo(access_token: str) -> dict[str, Any]:
-    async with httpx.AsyncClient(timeout=20) as client:
+async def userinfo(access_token: str, proxy: str | None = None) -> dict[str, Any]:
+    async with httpx.AsyncClient(timeout=20, proxy=httpx_proxy(proxy)) as client:
         resp = await client.get(
             config.USERINFO_ENDPOINT,
             headers={"Authorization": f"Bearer {access_token}"},
@@ -53,7 +54,7 @@ async def userinfo(access_token: str) -> dict[str, Any]:
         return resp.json()
 
 
-async def _post_cca(url: str, access_token: str, payload: dict) -> dict:
+async def _post_cca(url: str, access_token: str, payload: dict, proxy: str | None = None) -> dict:
     headers = {
         "Authorization": f"Bearer {access_token}",
         "Accept": "*/*",
@@ -67,23 +68,24 @@ async def _post_cca(url: str, access_token: str, payload: dict) -> dict:
             }
         ),
     }
-    async with httpx.AsyncClient(timeout=30) as client:
+    async with httpx.AsyncClient(timeout=30, proxy=httpx_proxy(proxy)) as client:
         resp = await client.post(url, headers=headers, json=payload)
         if resp.status_code >= 400:
             raise RuntimeError(f"{url} -> {resp.status_code} {resp.text[:400]}")
         return resp.json() if resp.content else {}
 
 
-async def load_code_assist(access_token: str) -> tuple[dict, str | None]:
+async def load_code_assist(access_token: str, proxy: str | None = None) -> tuple[dict, str | None]:
     data = await _post_cca(
         f"{config.PROD_API}/{config.API_VERSION}:loadCodeAssist",
         access_token,
         {"metadata": {"ideType": "ANTIGRAVITY"}},
+        proxy=proxy,
     )
     return data, _extract_project_id(data)
 
 
-async def onboard_user(access_token: str) -> tuple[dict, str | None]:
+async def onboard_user(access_token: str, proxy: str | None = None) -> tuple[dict, str | None]:
     last: dict = {}
     for _ in range(6):
         try:
@@ -102,6 +104,7 @@ async def onboard_user(access_token: str) -> tuple[dict, str | None]:
                         "ide_version": config.IDE_VERSION,
                     },
                 },
+                proxy=proxy,
             )
         except RuntimeError as exc:
             if "429" in str(exc) or "50" in str(exc):
@@ -119,6 +122,7 @@ async def onboard_user(access_token: str) -> tuple[dict, str | None]:
                             "ide_version": config.IDE_VERSION,
                         },
                     },
+                    proxy=proxy,
                 )
             except Exception:
                 raise exc
@@ -128,12 +132,12 @@ async def onboard_user(access_token: str) -> tuple[dict, str | None]:
     return last, _extract_project_id(last)
 
 
-async def activate(access_token: str) -> dict[str, Any]:
-    load_raw, project_id = await load_code_assist(access_token)
+async def activate(access_token: str, proxy: str | None = None) -> dict[str, Any]:
+    load_raw, project_id = await load_code_assist(access_token, proxy=proxy)
     onboard_raw = {}
     if not project_id:
-        onboard_raw, project_id = await onboard_user(access_token)
-        load_raw2, project_id2 = await load_code_assist(access_token)
+        onboard_raw, project_id = await onboard_user(access_token, proxy=proxy)
+        load_raw2, project_id2 = await load_code_assist(access_token, proxy=proxy)
         project_id = project_id or project_id2
         load_raw = load_raw2 or load_raw
     return {

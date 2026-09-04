@@ -92,6 +92,8 @@ Useful flags:
 - `--only you@gmail.com`
 - `--no-resume`
 
+`--proxy` accepts `http://host:port` and `socks5://user:pass@host:port`. SOCKS5 with auth is relayed through a local SK5 port because Chrome cannot speak authenticated SOCKS5. If `--proxy` is empty, the runner probes `127.0.0.1:7897/7890/10808/1080`.
+
 ## Output
 
 - `data/results.jsonl` - status / project_id / error
@@ -105,3 +107,5 @@ Useful flags:
 - Unsupported region IPs frequently return not eligible
 - Workspace / under-18 / unsupported country accounts can login and still get no permission
 - Do not run two browsers against port 51121 at the same time
+- Login uses a real Chrome process over CDP, not Playwright's bundled Chromium
+- Playwright-launched Chrome ignores Windows "system proxy" unless TUN mode is on; pass `--proxy` or run a local mixed port

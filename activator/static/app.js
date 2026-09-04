@@ -8,8 +8,13 @@ function escapeHtml(s) {
 }
 
 async function api(path, opts) {
-  const r = await fetch(path, Object.assign({ credentials: "same-origin" }, opts || {}));
-  const j = await r.json().catch(() => ({ ok: false, error: "bad json" }));
+  let r;
+  try {
+    r = await fetch(path, Object.assign({ credentials: "same-origin" }, opts || {}));
+  } catch (err) {
+    throw Object.assign(new Error("后端连不上（Failed to fetch）。服务可能挂了，先看 http://127.0.0.1:18888 还开不开"), { code: 0 });
+  }
+  const j = await r.json().catch(() => ({ ok: false, error: "bad json HTTP " + r.status }));
   if (r.status === 401) throw Object.assign(new Error("unauthorized"), { code: 401, body: j });
   return j;
 }

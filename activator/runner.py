@@ -18,6 +18,9 @@ from .callback import CallbackServer, code_from_url
 from .google_login import complete_google_login
 from .oauth import build_auth_url, generate_pkce
 from .onboard import activate, exchange_code, userinfo
+from .proxyutil import detect_local_proxy, playwright_proxy
+from .socks_bridge import Socks5Relay
+from .real_chrome import connect_real_chrome
 
 LogFn = Callable[[str], None]
 
@@ -129,6 +132,8 @@ class Activator:
         auth_url = build_auth_url(challenge, state)
         browser = None
         context = None
+        bridge = None
+        chrome_proc = None
         try:
             launch_kwargs: dict = {
                 "headless": not self.headed,
@@ -142,26 +147,35 @@ class Activator:
             channel = (self.channel or "").strip().lower()
             if channel and channel not in {"chromium", "none", "bundled"}:
                 launch_kwargs["channel"] = channel
-            proxy = acc.proxy or self.proxy
-            if proxy:
-                launch_kwargs["proxy"] = {"server": proxy}
-            try:
-                browser = await pw.chromium.launch(**launch_kwargs)
-            except Exception as exc:
-                if channel:
-                    self.log(f"channel={channel} launch failed ({exc}), fallback chromium")
-                    launch_kwargs.pop("channel", None)
-                    browser = await pw.chromium.launch(**launch_kwargs)
-                else:
-                    raise
-            context = await browser.new_context(
-                user_agent=config.CHROME_UA,
-                locale="en-US",
-                viewport={"width": 1280, "height": 860},
+            proxy = acc.proxy or self.proxy or detect_local_proxy()
+            pcfg = playwright_proxy(proxy) if proxy else None
+            socks_auth = bool(
+                pcfg and pcfg.get("username") and str(pcfg.get("server") or "").startswith("socks")
             )
-            await context.add_init_script(config.STEALTH_JS)
-            page = await context.new_page()
-            await page.goto(auth_url, wait_until="domcontentloaded")
+            if pcfg:
+                launch_kwargs["proxy"] = pcfg
+                self.log(f"proxy {pcfg.get('server')}")
+            bridge = None
+            if socks_auth:
+                bridge = Socks5Relay(proxy)
+                self.log("probing upstream socks5...")
+                bridge.probe(timeout=25)
+                self.log("upstream socks5 handshake ok")
+                local = bridge.start()
+                self.log(f"local sk5 {local}")
+                launch_kwargs["proxy"] = {"server": local}
+            profile = config.DATA_DIR / "chrome-profiles" / _safe_email(acc.email)
+            chrome_proxy = None
+            if launch_kwargs.get("proxy"):
+                chrome_proxy = launch_kwargs["proxy"].get("server")
+            elif proxy:
+                chrome_proxy = proxy
+            self.log("attach real chrome CDP")
+            chrome_proc, browser, context, page = await connect_real_chrome(
+                pw, profile, auth_url, proxy=chrome_proxy
+            )
+            page.set_default_timeout(self.timeout * 1000)
+            page.set_default_navigation_timeout(self.timeout * 1000)
             login_task = asyncio.create_task(
                 complete_google_login(page, acc.email, acc.password, acc.totp_secret, self.log, self.timeout)
             )
@@ -185,16 +199,16 @@ class Activator:
             finally:
                 for task in pending:
                     task.cancel()
-            tokens = await exchange_code(code, verifier)
+            tokens = await exchange_code(code, verifier, proxy=proxy)
             access = tokens.get("access_token")
             if not access:
                 raise RuntimeError(f"token exchange missing access_token: {tokens}")
             info = {}
             try:
-                info = await userinfo(access)
+                info = await userinfo(access, proxy=proxy)
             except Exception as exc:
                 self.log(f"userinfo failed: {exc}")
-            onboard = await activate(access)
+            onboard = await activate(access, proxy=proxy)
             payload = {
                 "email": acc.email,
                 "oauth_email": info.get("email"),
@@ -230,5 +244,15 @@ class Activator:
             try:
                 if browser:
                     await browser.close()
+            except Exception:
+                pass
+            try:
+                if bridge:
+                    bridge.stop()
+            except Exception:
+                pass
+            try:
+                if chrome_proc:
+                    chrome_proc.terminate()
             except Exception:
                 pass
