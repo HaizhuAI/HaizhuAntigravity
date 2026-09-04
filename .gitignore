@@ -11,8 +11,13 @@ accounts.json
 .env
 credentials.json
 .playwright-browsers/
-.env
 .DS_Store
 Thumbs.db
 data/chrome-profiles/
 data/*.txt
+data/*.png
+data/*.err
+capture_*.py
+tmp_*.py
+p1.py
+p2.py

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import random
+from pathlib import Path
 from typing import Callable
 
 from playwright.async_api import Page
@@ -136,7 +137,9 @@ async def complete_google_login(
             "此浏览器或应用可能不安全",
             "无法登录",
         ]):
-            raise RuntimeError("Google blocked this browser (not secure). Use --channel chrome and headed mode.")
+            log("Google insecure-browser warning, keep going")
+            await _click_first(page, ['button:has-text("Try again")', 'button:has-text("Next")', 'button:has-text("下一步")'])
+            await page.wait_for_timeout(800)
 
         if any(s in body for s in [
             "not eligible for antigravity",
@@ -151,22 +154,70 @@ async def complete_google_login(
             await page.wait_for_timeout(3000)
             continue
 
+        if "accountchooser" in url:
+            picked = page.locator('div[data-identifier="%s"]' % email).first
+            try:
+                if await picked.is_visible(timeout=600):
+                    await picked.click()
+                    email_filled = True
+                    password_filled = True
+                    log("picked saved account %s" % email)
+                    await page.wait_for_timeout(800)
+                    continue
+            except Exception:
+                pass
+
         if not email_filled:
-            if await _fill_if_empty(page, ['input[type="email"]', "#identifierId", 'input[name="identifier"]'], email):
+            shown = email.lower() in body
+            if (not shown) and await _click_first(page, [
+                'text=Use another account',
+                'text=使用其他账号',
+            ]):
+                log("clicked use another account")
+                await page.wait_for_timeout(800)
+            if await _fill_if_empty(page, ["#identifierId", 'input[type="email"]', 'input[name="identifier"]', 'input[autocomplete="username"]'], email):
                 email_filled = True
                 log(f"filled email {email}")
-                await page.wait_for_timeout(400)
-                await _click_first(page, NEXT_BUTTONS)
+                await page.wait_for_timeout(300)
+                try:
+                    await page.locator("#identifierId").press("Enter")
+                except Exception:
+                    await _click_first(page, NEXT_BUTTONS)
+                try:
+                    await page.locator('input[name="Passwd"]').wait_for(state="visible", timeout=8000)
+                    log("password box visible")
+                except Exception:
+                    log("password box not visible yet")
+                continue
+
+        if email_filled and await _visible(page, "#identifierId"):
+            await _click_first(page, NEXT_BUTTONS)
+            await page.wait_for_timeout(700)
+
+        if not password_filled:
+            if await _fill_if_empty(page, ['input[name="Passwd"]', 'input[type="password"]', 'input[name="password"]', 'input[aria-label*="password" i]'], password):
+                password_filled = True
+                log("filled password")
+                await page.wait_for_timeout(300)
+                try:
+                    await page.locator('input[name="Passwd"]').press("Enter")
+                except Exception:
+                    await _click_first(page, NEXT_BUTTONS)
                 await page.wait_for_timeout(1200)
                 continue
 
-        if not password_filled:
-            if await _fill_if_empty(page, ['input[name="Passwd"]', 'input[type="password"]', 'input[name="password"]'], password):
-                password_filled = True
-                log("filled password")
-                await page.wait_for_timeout(400)
+        if "enter the last password" in body or (
+            "account recovery" in body and await _visible(page, 'input[type="password"]')
+        ):
+            if await _fill_if_empty(
+                page,
+                ['input[name="Passwd"]', 'input[type="password"]', 'input[name="password"]'],
+                password,
+            ):
+                log("filled last remembered password")
+                await page.wait_for_timeout(250)
                 await _click_first(page, NEXT_BUTTONS)
-                await page.wait_for_timeout(1500)
+                await page.wait_for_timeout(1200)
                 continue
 
         if totp_secret and not totp_filled:
@@ -183,7 +234,7 @@ async def complete_google_login(
                 code6 = current_code(totp_secret)
                 if await _fill_if_empty(page, ['input[name="totpPin"]', "#totpPin", 'input[autocomplete="one-time-code"]'], code6):
                     totp_filled = True
-                    log(f"filled TOTP {code6}")
+                    log("filled TOTP")
                     await page.wait_for_timeout(300)
                     await _click_first(page, NEXT_BUTTONS)
                     await page.wait_for_timeout(1500)
@@ -198,13 +249,28 @@ async def complete_google_login(
                 await page.wait_for_timeout(800)
                 continue
 
+        if any(s in body for s in [
+            "downloaded this app from google",
+            "make sure that you downloaded",
+            "确定您是从 google 下载",
+            "下载了此应用",
+        ]):
+            if await _click_first(page, [
+                'button:has-text("Sign in")',
+                'button:has-text("登录")',
+            ]):
+                log("confirmed first-party app sign-in")
+                await page.wait_for_timeout(800)
+                continue
+
         if await _click_first(page, [
+            'button:has-text("Sign in")',
+            'button:has-text("登录")',
             'button:has-text("I understand")',
             'button:has-text("Not now")',
             'button:has-text("Skip")',
             'button:has-text("以后再说")',
             'button:has-text("跳过")',
-            'button:has-text("取消")',
         ]):
             await page.wait_for_timeout(600)
 
@@ -216,4 +282,10 @@ async def complete_google_login(
 
         await page.wait_for_timeout(700)
 
+    try:
+        shot = Path(__file__).resolve().parent.parent / "data" / "last_login.png"
+        await page.screenshot(path=str(shot), full_page=True)
+        log(f"timeout screenshot {shot} url={page.url}")
+    except Exception:
+        pass
     raise TimeoutError("Google login did not finish before timeout")

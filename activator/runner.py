@@ -195,6 +195,22 @@ class Activator:
                 if not code:
                     code = code_from_url(page.url)
                 if not code:
+                    for extra in list(pending):
+                        try:
+                            value = await asyncio.wait_for(asyncio.shield(extra), timeout=25)
+                            if isinstance(value, str) and value:
+                                code = value
+                                break
+                        except Exception as exc:
+                            errors.append(str(exc))
+                    code = code or code_from_url(page.url)
+                if not code:
+                    try:
+                        shot = config.DATA_DIR / "last_login.png"
+                        await page.screenshot(path=str(shot), full_page=True)
+                        self.log(f"no code url={page.url} shot={shot}")
+                    except Exception as exc:
+                        self.log(f"screenshot failed {exc}")
                     raise RuntimeError(errors[0] if errors else "no OAuth code")
             finally:
                 for task in pending:

@@ -35,12 +35,13 @@ class CallbackServer:
             first = data.decode("latin-1", errors="ignore").split("\r\n", 1)[0]
             path = first.split(" ")[1] if " " in first else "/"
             qs = parse_qs(urlparse(path).query)
-            if qs.get("error"):
-                self.error = (qs.get("error_description") or qs.get("error") or ["unknown"])[0]
-                self._event.set()
             code = (qs.get("code") or [None])[0]
             if code:
                 self.code = code
+                self.error = None
+                self._event.set()
+            elif qs.get("error"):
+                self.error = (qs.get("error_description") or qs.get("error") or ["unknown"])[0]
                 self._event.set()
             writer.write(SUCCESS_HTML)
             await writer.drain()
@@ -62,15 +63,17 @@ class CallbackServer:
             ) from exc
 
     async def wait_code(self, timeout: float = 180.0) -> str:
-        try:
-            await asyncio.wait_for(self._event.wait(), timeout=timeout)
-        except TimeoutError as exc:
-            raise TimeoutError("OAuth callback timed out") from exc
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+        while loop.time() < deadline:
+            if self.code:
+                return self.code
+            await asyncio.sleep(0.2)
+        if self.code:
+            return self.code
         if self.error:
             raise RuntimeError(self.error)
-        if not self.code:
-            raise RuntimeError("OAuth callback missing code")
-        return self.code
+        raise TimeoutError("OAuth callback timed out")
 
     async def close(self) -> None:
         if self._server:

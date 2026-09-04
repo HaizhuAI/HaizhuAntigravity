@@ -109,3 +109,6 @@ Useful flags:
 - Do not run two browsers against port 51121 at the same time
 - Login uses a real Chrome process over CDP, not Playwright's bundled Chromium
 - Playwright-launched Chrome ignores Windows "system proxy" unless TUN mode is on; pass `--proxy` or run a local mixed port
+- Saved Chrome profiles reuse Google sessions. The activator picks the matching email on the account chooser instead of clicking Use another account.
+- If Google shows Make sure you downloaded this app from Google, click Sign in. Cancel produces access_denied.
+- Android device prompts stay on screen for a manual tap; the callback keeps listening until timeout.
